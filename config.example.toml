@@ -1,0 +1,21 @@
+[microsoft]
+client_id = "00000000-0000-0000-0000-000000000000"
+tenant_id = "organizations"
+# token_cache = "~/.local/state/busybar-msteams/msal-token-cache.json"
+
+[busybar]
+# Usually omit both values and let busylib discover the bar.
+# name = "Office BUSY Bar"
+# host = "10.0.4.20"
+discovery_timeout = 1.5
+# Prefer BUSYBAR_TOKEN in the environment instead of storing the PIN here.
+# token = "1234"
+
+[polling]
+presence_seconds = 20.0
+calendar_seconds = 300.0
+lookahead_days = 7
+
+[app]
+clear_on_exit = true
+log_level = "INFO"
