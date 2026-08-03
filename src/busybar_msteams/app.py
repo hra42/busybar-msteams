@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Event
 
 from busylib import BusyBar, exceptions
 
@@ -39,13 +39,14 @@ class AppConfig:
     clear_on_exit: bool = True
 
 
-def run(config: AppConfig) -> None:
+def run(config: AppConfig, *, stop_event: Event | None = None) -> None:
+    stop_event = stop_event or Event()
     tokens = TokenProvider(config.client_id, config.tenant_id, config.token_cache)
     with GraphClient(tokens) as graph:
         if config.dry_run:
             _run_dry(graph, config)
             return
-        _run_device(graph, config)
+        _run_device(graph, config, stop_event)
 
 
 def _run_dry(graph: GraphClient, config: AppConfig) -> None:
@@ -56,7 +57,7 @@ def _run_dry(graph: GraphClient, config: AppConfig) -> None:
     print(build_payload(state, now).model_dump_json(indent=2))
 
 
-def _run_device(graph: GraphClient, config: AppConfig) -> None:
+def _run_device(graph: GraphClient, config: AppConfig, stop_event: Event) -> None:
     meetings: list[Meeting] | None = None
     presence: TeamsPresence | None = None
     next_calendar_refresh = datetime.min.replace(tzinfo=UTC)
@@ -88,7 +89,7 @@ def _run_device(graph: GraphClient, config: AppConfig) -> None:
             )
 
         try:
-            while True:
+            while not stop_event.is_set():
                 now = datetime.now(UTC)
                 error_message: str | None = None
                 try:
@@ -139,7 +140,7 @@ def _run_device(graph: GraphClient, config: AppConfig) -> None:
                     break
                 delay = max(config.poll_seconds, retry_after)
                 retry_after = 0.0
-                time.sleep(delay)
+                stop_event.wait(delay)
         except KeyboardInterrupt:
             logger.info("Stopping")
         finally:

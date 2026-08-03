@@ -1,0 +1,7 @@
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!docker-entrypoint.sh
+!src/
+!src/**

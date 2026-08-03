@@ -1,0 +1,34 @@
+name: busybar-msteams
+
+services:
+  busybar-msteams:
+    image: busybar-msteams:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 45s
+    environment:
+      BUSYBAR_MSTEAMS_CONFIG: /config/config.toml
+      MS_TOKEN_CACHE: /data/msal-token-cache.json
+      MS_CLIENT_ID: ${MS_CLIENT_ID:-}
+      MS_TENANT_ID: ${MS_TENANT_ID:-}
+      BUSYBAR_HOST: ${BUSYBAR_HOST:-}
+      BUSYBAR_NAME: ${BUSYBAR_NAME:-}
+      BUSYBAR_TOKEN: ${BUSYBAR_TOKEN:-}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - type: bind
+        source: ./config.toml
+        target: /config/config.toml
+        read_only: true
+      - type: volume
+        source: busybar-data
+        target: /data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+
+volumes:
+  busybar-data:

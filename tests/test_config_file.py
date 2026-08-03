@@ -77,6 +77,22 @@ def test_cli_and_environment_override_file(
     assert config.clear_on_exit
 
 
+def test_empty_compose_environment_falls_back_to_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "config.toml"
+    write_config(path)
+    monkeypatch.setenv("MS_CLIENT_ID", "")
+    monkeypatch.setenv("MS_TENANT_ID", "")
+    monkeypatch.setenv("BUSYBAR_NAME", "")
+
+    config, _ = parse_config(["--config", str(path)])
+
+    assert config.client_id == "from-file"
+    assert config.tenant_id == "file-tenant"
+    assert config.device_name == "Office"
+
+
 def test_project_local_config_is_loaded_implicitly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

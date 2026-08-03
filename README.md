@@ -147,3 +147,64 @@ uv run ruff check .
 ```
 
 No Microsoft or BUSY Bar credentials are required for the unit tests.
+
+## Docker Compose
+
+The application runs as an unprivileged user and contains only the locked
+production dependencies. A tiny root entrypoint fixes ownership of a newly
+created token volume and immediately drops privileges. The config is mounted
+read-only, while the Microsoft token cache is kept in that named Docker volume.
+
+Prepare the configuration and Compose environment:
+
+```bash
+cp config.example.toml config.toml
+cp .env.example .env
+```
+
+Set `microsoft.client_id`, `microsoft.tenant_id`, and `busybar.host` in
+`config.toml`. A fixed LAN address is recommended in Docker because mDNS
+discovery usually does not cross the default Docker bridge. Set the BUSY Bar PIN
+and local timezone in `.env`:
+
+```dotenv
+BUSYBAR_TOKEN=1234
+TZ=Europe/Berlin
+```
+
+Build the image and perform the one-time Microsoft login interactively:
+
+```bash
+docker compose build
+docker compose run --rm busybar-msteams --dry-run
+```
+
+The login stores the MSAL token cache in the `busybar-data` named volume. Start
+the long-running service afterward:
+
+```bash
+docker compose up --detach
+docker compose logs --follow
+```
+
+Manage it with:
+
+```bash
+docker compose restart
+docker compose down
+docker compose build --pull
+docker compose up --detach
+```
+
+`docker compose down` preserves the authentication volume; add `--volumes` only
+when you deliberately want to remove the cached Microsoft login.
+
+On Linux, mDNS discovery can use host networking through the optional override:
+
+```bash
+docker compose -f compose.yaml -f compose.host-network.yaml up --detach
+```
+
+Host networking is less isolated and is not needed when `busybar.host` is set.
+On Docker Desktop it must be enabled in Docker settings before using the
+override.

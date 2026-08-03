@@ -1,0 +1,5 @@
+# Optional override for Linux hosts when BUSY Bar mDNS discovery is required.
+# Docker Desktop requires host networking to be enabled explicitly.
+services:
+  busybar-msteams:
+    network_mode: host

@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 from busybar_msteams.app import AppConfig, run
@@ -31,7 +33,10 @@ def _env_or_config(
     key: str,
     default: Any,
 ) -> Any:
-    return os.environ.get(env_name, config_value(config, section, key, default))
+    env_value = os.environ.get(env_name)
+    if env_value not in (None, ""):
+        return env_value
+    return config_value(config, section, key, default)
 
 
 def build_parser(
@@ -191,8 +196,16 @@ def main(argv: list[str] | None = None) -> int:
         level=getattr(logging, log_level),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    stop_event = Event()
+
+    def request_stop(signum: int, frame: object) -> None:
+        logging.getLogger(__name__).info("Received signal %s; stopping", signum)
+        stop_event.set()
+
+    signal.signal(signal.SIGINT, request_stop)
+    signal.signal(signal.SIGTERM, request_stop)
     try:
-        run(config)
+        run(config, stop_event=stop_event)
     except (GraphError, DeviceDiscoveryError) as error:
         logging.getLogger(__name__).error("%s", error)
         return 1
