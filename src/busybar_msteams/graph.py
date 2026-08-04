@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 import msal
+import requests
 
 from busybar_msteams.models import Meeting, TeamsPresence, clean_subject
 
@@ -24,10 +25,37 @@ class GraphError(RuntimeError):
         self.retry_after = retry_after
 
 
+def _timeout_session(timeout: float, ipv4_only: bool = False) -> requests.Session:
+    """MSAL's default session has no timeout, so a black-holed route (commonly a
+    broken IPv6 default) blocks sign-in forever and makes Ctrl+C unresponsive."""
+
+    class _Session(requests.Session):
+        def request(self, *args: Any, **kwargs: Any) -> requests.Response:
+            kwargs.setdefault("timeout", timeout)
+            return super().request(*args, **kwargs)
+
+    session = _Session()
+    if ipv4_only:
+        adapter = requests.adapters.HTTPAdapter()
+        adapter.init_poolmanager(
+            connections=10, maxsize=10, source_address=("0.0.0.0", 0)
+        )
+        session.mount("https://", adapter)
+    return session
+
+
 class TokenProvider:
     """Acquire delegated Graph tokens and persist MSAL's refresh-token cache."""
 
-    def __init__(self, client_id: str, tenant_id: str, cache_path: Path) -> None:
+    def __init__(
+        self,
+        client_id: str,
+        tenant_id: str,
+        cache_path: Path,
+        *,
+        timeout: float = 10.0,
+        ipv4_only: bool = False,
+    ) -> None:
         self.cache_path = cache_path.expanduser()
         self.cache = msal.SerializableTokenCache()
         self._load_cache()
@@ -35,6 +63,7 @@ class TokenProvider:
             client_id,
             authority=f"https://login.microsoftonline.com/{tenant_id}",
             token_cache=self.cache,
+            http_client=_timeout_session(timeout, ipv4_only),
         )
 
     def _load_cache(self) -> None:
@@ -80,9 +109,19 @@ class TokenProvider:
 
 
 class GraphClient:
-    def __init__(self, tokens: TokenProvider, *, timeout: float = 10.0) -> None:
+    def __init__(
+        self, tokens: TokenProvider, *, timeout: float = 10.0, ipv4_only: bool = False
+    ) -> None:
         self.tokens = tokens
-        self.client = httpx.Client(base_url=GRAPH_ROOT, timeout=timeout)
+        # A short connect timeout keeps a dead address (typically a black-holed
+        # IPv6 route) from stalling the poll loop; reads still get the full budget.
+        self.client = httpx.Client(
+            base_url=GRAPH_ROOT,
+            timeout=httpx.Timeout(timeout, connect=5.0),
+            transport=httpx.HTTPTransport(
+                local_address="0.0.0.0" if ipv4_only else None
+            ),
+        )
 
     def __enter__(self) -> GraphClient:
         return self

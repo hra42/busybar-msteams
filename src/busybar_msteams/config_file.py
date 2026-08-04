@@ -7,8 +7,13 @@ from typing import Any
 ALLOWED_KEYS = {
     "microsoft": {"client_id", "tenant_id", "token_cache"},
     "busybar": {"host", "name", "token", "discovery_timeout"},
-    "polling": {"presence_seconds", "calendar_seconds", "lookahead_days"},
-    "app": {"clear_on_exit", "log_level"},
+    "polling": {
+        "presence_seconds",
+        "calendar_seconds",
+        "display_seconds",
+        "lookahead_days",
+    },
+    "app": {"clear_on_exit", "log_level", "ipv4_only"},
 }
 EXPECTED_TYPES: dict[tuple[str, str], type | tuple[type, ...]] = {
     ("microsoft", "client_id"): str,
@@ -20,9 +25,11 @@ EXPECTED_TYPES: dict[tuple[str, str], type | tuple[type, ...]] = {
     ("busybar", "discovery_timeout"): (int, float),
     ("polling", "presence_seconds"): (int, float),
     ("polling", "calendar_seconds"): (int, float),
+    ("polling", "display_seconds"): (int, float),
     ("polling", "lookahead_days"): int,
     ("app", "clear_on_exit"): bool,
     ("app", "log_level"): str,
+    ("app", "ipv4_only"): bool,
 }
 
 

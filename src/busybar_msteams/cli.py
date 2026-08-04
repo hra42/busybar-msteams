@@ -107,11 +107,23 @@ def build_parser(
         default=config_value(config, "polling", "calendar_seconds", 300.0),
     )
     parser.add_argument(
+        "--display-refresh-seconds",
+        type=float,
+        default=config_value(config, "polling", "display_seconds", 60.0),
+        help="Redraw unchanged content to recover from BUSY Bar restarts",
+    )
+    parser.add_argument(
         "--lookahead-days",
         type=int,
         default=config_value(config, "polling", "lookahead_days", 7),
     )
     parser.add_argument("--once", action="store_true")
+    parser.add_argument(
+        "--ipv4-only",
+        action="store_true",
+        default=config_value(config, "app", "ipv4_only", False),
+        help="Skip IPv6 for Microsoft calls; use when IPv6 routing is broken",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -167,6 +179,8 @@ def parse_config(argv: list[str] | None = None) -> tuple[AppConfig, str]:
         parser.error("--discovery-timeout must be greater than 0")
     if args.calendar_refresh_seconds < 60:
         parser.error("--calendar-refresh-seconds must be at least 60")
+    if args.display_refresh_seconds < args.poll_seconds:
+        parser.error("--display-refresh-seconds must be at least --poll-seconds")
     if not 1 <= args.lookahead_days <= 30:
         parser.error("--lookahead-days must be between 1 and 30")
 
@@ -181,10 +195,12 @@ def parse_config(argv: list[str] | None = None) -> tuple[AppConfig, str]:
             device_token=args.device_token,
             poll_seconds=args.poll_seconds,
             calendar_refresh_seconds=args.calendar_refresh_seconds,
+            display_refresh_seconds=args.display_refresh_seconds,
             lookahead_days=args.lookahead_days,
             once=args.once,
             dry_run=args.dry_run,
             clear_on_exit=args.clear_on_exit,
+            ipv4_only=args.ipv4_only,
         ),
         args.log_level,
     )
@@ -201,6 +217,10 @@ def main(argv: list[str] | None = None) -> int:
     def request_stop(signum: int, frame: object) -> None:
         logging.getLogger(__name__).info("Received signal %s; stopping", signum)
         stop_event.set()
+        # The flag is only read between poll cycles, so a blocking network call
+        # would swallow the request. Restore the default handler so a second
+        # Ctrl+C always interrupts instead of appearing to do nothing.
+        signal.signal(signum, signal.SIG_DFL)
 
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)

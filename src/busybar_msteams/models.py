@@ -8,7 +8,6 @@ from enum import StrEnum
 
 class ScreenMode(StrEnum):
     ON_CALL = "on_call"
-    MEETING_NOW = "meeting_now"
     UPCOMING = "upcoming"
     IDLE = "idle"
     ERROR = "error"
@@ -61,6 +60,14 @@ def select_current_or_next(
     return None, False
 
 
+def next_meeting(meetings: list[Meeting], now: datetime) -> Meeting | None:
+    """Return the soonest meeting that has not started yet."""
+    upcoming = [meeting for meeting in meetings if meeting.start > now]
+    if upcoming:
+        return min(upcoming, key=lambda meeting: meeting.start)
+    return None
+
+
 def build_screen_state(
     meetings: list[Meeting], presence: TeamsPresence, now: datetime
 ) -> ScreenState:
@@ -73,20 +80,23 @@ def build_screen_state(
             meeting=meeting if is_current else None,
             presence=presence,
         )
-    if is_current:
-        return ScreenState(ScreenMode.MEETING_NOW, meeting=meeting, presence=presence)
-    if meeting:
-        return ScreenState(ScreenMode.UPCOMING, meeting=meeting, presence=presence)
+    # A meeting in progress is not worth announcing on its own: it often ends
+    # early, so the useful information is always what comes next.
+    upcoming = next_meeting(meetings, now)
+    if upcoming:
+        return ScreenState(ScreenMode.UPCOMING, meeting=upcoming, presence=presence)
     return ScreenState(ScreenMode.IDLE, presence=presence)
 
 
-def format_hours(until: datetime, now: datetime) -> str:
-    """Format a future instant as a conservative hours countdown."""
-    hours = max(0.0, (until - now).total_seconds() / 3600)
-    if hours == 0:
+def format_countdown(until: datetime, now: datetime) -> str:
+    """Format a future instant: MM:SS within the hour, conservative hours beyond."""
+    seconds = max(0.0, (until - now).total_seconds())
+    if seconds == 0:
         return "NOW"
-    if hours < 0.1:
-        return "<0.1h"
+    if seconds < 3600:
+        whole = math.ceil(seconds)
+        return f"{whole // 60:d}:{whole % 60:02d}"
+    hours = seconds / 3600
     if hours < 10:
         return f"{math.ceil(hours * 10) / 10:.1f}h"
     return f"{math.ceil(hours):d}h"

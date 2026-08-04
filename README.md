@@ -63,6 +63,7 @@ name = "Office BUSY Bar"
 [polling]
 presence_seconds = 20.0
 calendar_seconds = 300.0
+display_seconds = 60.0
 lookahead_days = 7
 ```
 
@@ -114,14 +115,22 @@ prompts for it at startup. The value is used for that run only and is not saved.
 | Teams state | Front display | Meaning |
 | --- | --- | --- |
 | Live call or presenting | `ON CALL` in red | Do not disturb |
-| Calendar meeting underway, not in a call | `JOIN?` in amber | Scheduled, but not connected |
-| Future Teams meeting | `NEXT 1.3h` in blue | Hours until start |
+| Teams meeting an hour or more away | `NEXT 1.3h` in blue | Hours until start |
+| Teams meeting under an hour away | `NEXT 5:30` in blue | Minutes and seconds until start |
 | No Teams meetings in the next 7 days | `NO CALLS` | Idle |
 
-Presence is checked every 20 seconds and the calendar every five minutes. A
-transient Graph failure never clears an existing on-call state; the app waits
-for a positive non-call presence update. Microsoft Graph `429` responses honor
-the service's `Retry-After` value.
+A meeting already in progress is not shown on its own; meetings often end
+early, so the countdown always points at the next one that has not started.
+
+Within the final hour the screen redraws every second so the `MM:SS` countdown
+ticks. This is a local redraw only — Microsoft Graph stays on the polling
+intervals below.
+
+Presence is checked every 20 seconds and the calendar every five minutes. The
+current screen is redrawn every 60 seconds so a BUSY Bar power cycle recovers
+without restarting this service. A transient Graph failure never clears an
+existing on-call state; the app waits for a positive non-call presence update.
+Microsoft Graph `429` responses honor the service's `Retry-After` value.
 
 Useful commands:
 
@@ -138,6 +147,26 @@ uv run busybar-msteams --help
 
 By default, stopping with Ctrl+C clears only this app's BUSY Bar display. Pass
 `--no-clear` to leave its last screen visible.
+
+### Slow or hanging startup
+
+If the app seems to do nothing for a minute or more before drawing, the network
+is likely advertising an IPv6 default route that drops traffic. Microsoft
+resolves to IPv6 first, so every connection waits for those addresses to time
+out. Compare the two:
+
+```bash
+curl -6 --max-time 5 https://login.microsoftonline.com/   # hangs when broken
+curl -4 --max-time 5 https://login.microsoftonline.com/   # works
+```
+
+If only the IPv4 call succeeds, skip IPv6 for the Microsoft calls:
+
+```bash
+uv run busybar-msteams --ipv4-only
+```
+
+Set `ipv4_only = true` under `[app]` in `config.toml` to make it permanent.
 
 ## Development
 

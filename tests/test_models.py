@@ -5,7 +5,7 @@ from busybar_msteams.models import (
     ScreenMode,
     TeamsPresence,
     build_screen_state,
-    format_hours,
+    format_countdown,
 )
 
 NOW = datetime(2026, 8, 3, 10, 0, tzinfo=UTC)
@@ -40,7 +40,17 @@ def test_scheduled_meeting_does_not_claim_user_is_on_call() -> None:
     state = build_screen_state(
         [meeting(-0.5, 0.5)], TeamsPresence("Busy", "InAMeeting"), NOW
     )
-    assert state.mode is ScreenMode.MEETING_NOW
+    assert state.mode is ScreenMode.IDLE
+
+
+def test_meeting_in_progress_is_skipped_for_the_next_one() -> None:
+    state = build_screen_state(
+        [meeting(-0.5, 0.5), meeting(2, 3)],
+        TeamsPresence("Available", "Available"),
+        NOW,
+    )
+    assert state.mode is ScreenMode.UPCOMING
+    assert state.meeting and state.meeting.start == NOW + timedelta(hours=2)
 
 
 def test_next_meeting_and_hours_are_selected() -> None:
@@ -49,4 +59,17 @@ def test_next_meeting_and_hours_are_selected() -> None:
     )
     assert state.mode is ScreenMode.UPCOMING
     assert state.meeting and state.meeting.start == NOW + timedelta(hours=1.21)
-    assert format_hours(state.meeting.start, NOW) == "1.3h"
+    assert format_countdown(state.meeting.start, NOW) == "1.3h"
+
+
+def test_countdown_under_an_hour_shows_minutes_and_seconds() -> None:
+    assert format_countdown(NOW + timedelta(minutes=59, seconds=59), NOW) == "59:59"
+    assert format_countdown(NOW + timedelta(minutes=5, seconds=30), NOW) == "5:30"
+    assert format_countdown(NOW + timedelta(seconds=45), NOW) == "0:45"
+    assert format_countdown(NOW + timedelta(seconds=5), NOW) == "0:05"
+    assert format_countdown(NOW, NOW) == "NOW"
+
+
+def test_countdown_at_and_above_an_hour_stays_in_hours() -> None:
+    assert format_countdown(NOW + timedelta(hours=1), NOW) == "1.0h"
+    assert format_countdown(NOW + timedelta(hours=12), NOW) == "12h"

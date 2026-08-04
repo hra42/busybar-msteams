@@ -20,6 +20,7 @@ discovery_timeout = 2.5
 [polling]
 presence_seconds = 30.0
 calendar_seconds = 600.0
+display_seconds = 90.0
 lookahead_days = 14
 
 [app]
@@ -47,6 +48,7 @@ def test_config_file_populates_app_config(
     assert config.discovery_timeout == 2.5
     assert config.poll_seconds == 30.0
     assert config.calendar_refresh_seconds == 600.0
+    assert config.display_refresh_seconds == 90.0
     assert config.lookahead_days == 14
     assert not config.clear_on_exit
     assert log_level == "WARNING"

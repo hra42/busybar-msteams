@@ -14,8 +14,11 @@ discovery_timeout = 1.5
 [polling]
 presence_seconds = 20.0
 calendar_seconds = 300.0
+display_seconds = 60.0
 lookahead_days = 7
 
 [app]
 clear_on_exit = true
 log_level = "INFO"
+# Enable when IPv6 routing is broken and Microsoft calls stall on startup.
+# ipv4_only = true

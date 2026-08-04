@@ -4,13 +4,12 @@ from datetime import datetime
 
 from busylib import types
 
-from busybar_msteams.models import ScreenMode, ScreenState, format_hours
+from busybar_msteams.models import ScreenMode, ScreenState, format_countdown
 
 APP_NAME = "busybar-msteams"
 
 COLORS = {
     ScreenMode.ON_CALL: ("#B00020FF", "#FFFFFFFF"),
-    ScreenMode.MEETING_NOW: ("#C77800FF", "#FFFFFFFF"),
     ScreenMode.UPCOMING: ("#0067B8FF", "#FFFFFFFF"),
     ScreenMode.IDLE: ("#123524FF", "#FFFFFFFF"),
     ScreenMode.ERROR: ("#7A2400FF", "#FFFFFFFF"),
@@ -25,16 +24,12 @@ def build_payload(state: ScreenState, now: datetime) -> types.DisplayElements:
         front = "ON CALL"
         title = "TEAMS · LIVE"
         detail = "Do not disturb"
-    elif state.mode is ScreenMode.MEETING_NOW:
-        front = "JOIN?"
-        title = "MEETING NOW"
-        detail = "Not currently in a Teams call"
     elif state.mode is ScreenMode.UPCOMING and state.meeting:
-        countdown = format_hours(state.meeting.start, now)
+        countdown = format_countdown(state.meeting.start, now)
         front = f"NEXT {countdown}"
         title = "NEXT TEAMS"
         local_start = state.meeting.start.astimezone().strftime("%H:%M")
-        detail = f"{local_start} · in {countdown}"
+        detail = f"{local_start} · starts in {countdown}"
     elif state.mode is ScreenMode.ERROR:
         front = "SYNC ERR"
         title = "MICROSOFT GRAPH"
